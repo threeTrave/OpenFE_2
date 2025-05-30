@@ -1,9 +1,9 @@
 import traceback
 from .FeatureGenerator import Node, FNode
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 import numpy as np
-
+from tqdm import tqdm
 
 def tree_to_formula(tree):
     if isinstance(tree, Node):
@@ -135,8 +135,13 @@ def transform(X_train, X_test, new_features_list, n_jobs, name=""):
     n_train = len(X_train)
     ex = ProcessPoolExecutor(n_jobs)
     results = []
-    for feature in new_features_list:
-        results.append(ex.submit(_cal, feature, n_train))
+    with tqdm(
+        total=len(new_features_list), desc="Calculating new features..."
+    ) as progress_bar:
+        results = [ex.submit(_cal, feature, n_train) for feature in new_features_list]
+        for feature in as_completed(results):
+            progress_bar.set_postfix(feature=feature.result()[-1])
+            progress_bar.update(1)
     ex.shutdown(wait=True)
     _train = []
     _test = []
